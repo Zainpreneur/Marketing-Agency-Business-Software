@@ -1,0 +1,208 @@
+// Marketing Agency Business Application — Prisma schema
+// Uses SQLite for zero-config local development. Swap `provider`/`url`
+// to "postgresql" + a connection string for production use.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum ClientStatus {
+  LEAD
+  ACTIVE
+  PAUSED
+  CHURNED
+}
+
+enum CampaignStatus {
+  PLANNING
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum CampaignChannel {
+  SOCIAL_MEDIA
+  SEO
+  PPC
+  EMAIL
+  CONTENT
+  BRANDING
+  PR
+  EVENTS
+  OTHER
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(EMPLOYEE)
+  title         String?
+  avatarColor   String   @default("#6366f1")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  ownedClients    Client[]   @relation("ClientOwner")
+  managedCampaigns Campaign[] @relation("CampaignManager")
+  assignedTasks   Task[]     @relation("TaskAssignee")
+  comments        Comment[]
+  activities      Activity[]
+}
+
+model Client {
+  id          String       @id @default(cuid())
+  name        String
+  company     String
+  email       String       @unique
+  phone       String?
+  address     String?
+  industry    String?
+  website     String?
+  status      ClientStatus @default(LEAD)
+  notes       String?
+  logoColor   String       @default("#0ea5e9")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  owner       User?     @relation("ClientOwner", fields: [ownerId], references: [id])
+  ownerId     String?
+
+  campaigns   Campaign[]
+  invoices    Invoice[]
+  activities  Activity[]
+}
+
+model Campaign {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  status      CampaignStatus  @default(PLANNING)
+  channel     CampaignChannel @default(OTHER)
+  budget      Float           @default(0)
+  spent       Float           @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId    String
+
+  manager     User?    @relation("CampaignManager", fields: [managerId], references: [id])
+  managerId   String?
+
+  tasks       Task[]
+  invoices    Invoice[]
+  activities  Activity[]
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId  String?
+
+  assignee    User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  assigneeId  String?
+
+  comments    Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  task      Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String
+
+  author    User?  @relation(fields: [authorId], references: [id])
+  authorId  String?
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  number      String        @unique
+  status      InvoiceStatus @default(DRAFT)
+  issueDate   DateTime      @default(now())
+  dueDate     DateTime
+  tax         Float         @default(0)
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId    String
+
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+  campaignId  String?
+
+  items       InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  description String
+  quantity    Float   @default(1)
+  rate        Float   @default(0)
+
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId   String
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  message   String
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+
+  client    Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId  String?
+
+  campaign  Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String?
+}
